@@ -14,6 +14,9 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+
+import java.util.concurrent.TimeUnit;
 
 import static com.example.demo.security.ApplicationUserPermission.*;
 import static com.example.demo.security.ApplicationUserRole.*;
@@ -31,26 +34,33 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
   @Override
   protected void configure(HttpSecurity http) throws Exception {
     http
-/*
-            .csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-            .and()
-*/
             .csrf().disable()
             .authorizeRequests()
             .antMatchers("/", "/index", "/css/*", "/js/*")
             .permitAll()
             .antMatchers("/api/**").hasRole(STUDENT.name())
-/*
-             replaced with annotation @PreAuthorize in Controller
-            .antMatchers(HttpMethod.GET, "/management/api/**").hasAnyRole(ADMIN.name(), ADMINTRAINEE.name())
-            .antMatchers(HttpMethod.DELETE,"/management/api/**").hasAuthority(COURSE_WRITE.getPermission())
-            .antMatchers(HttpMethod.POST,"/management/api/**").hasAuthority(COURSE_WRITE.getPermission())
-            .antMatchers(HttpMethod.PUT,"/management/api/**").hasAuthority(COURSE_WRITE.getPermission())
-*/
             .anyRequest()
             .authenticated()
             .and()
-            .formLogin();
+            .formLogin()
+            .loginPage("/login")
+            .permitAll()
+            .defaultSuccessUrl("/courses", true)
+            .passwordParameter("password") // name in html
+            .usernameParameter("username") // name in html
+            .and() // 30 minutes lifetime
+            .rememberMe() // 2 weeks lifetime
+            .tokenValiditySeconds((int) TimeUnit.DAYS.toSeconds(21)) // 21 days lifetime
+            .key("somethingverysecured")
+            .rememberMeParameter("remember-me") // name in parameter
+            .and()
+            .logout()
+            .logoutUrl("/logout")
+            .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET"))
+            .clearAuthentication(true)
+            .invalidateHttpSession(true)
+            .deleteCookies("JSESSIONID", "remember-me")
+            .logoutSuccessUrl("/login");
   }
 
   @Override
@@ -76,7 +86,6 @@ public class ApplicationSecurityConfig extends WebSecurityConfigurerAdapter {
 //            .roles(ADMINTRAINEE.name()) // ROLE_ADMINTRAINEE
             .authorities(ADMINTRAINEE.getGrantedAuthorities())
             .build();
-
 
 
     return new InMemoryUserDetailsManager(
